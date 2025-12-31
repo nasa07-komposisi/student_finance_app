@@ -54,12 +54,19 @@ def test_recap():
         
     # Mock Data for Sorting
     recap_data = [
-        {"No Absen": "10", "Nama Siswa": "Zara", "Jumlah": 1},
-        {"No Absen": "1", "Nama Siswa": "Adam", "Jumlah": 2},
-        {"No Absen": "2", "Nama Siswa": "Budi", "Jumlah": 3}
+        {"No Absen": "10", "Nama Siswa": "Zara", "Jumlah": 1, "Rupiah": 66000, "January": "Sudah Bayar"},
+        {"No Absen": "1", "Nama Siswa": "Adam", "Jumlah": 2, "Rupiah": 132000, "January": "Sudah Bayar", "February": "Sudah Bayar"},
+        {"No Absen": "2", "Nama Siswa": "Budi", "Jumlah": 3, "Rupiah": 198000, "January": "Sudah Bayar", "February": "Sudah Bayar", "March": "Sudah Bayar"}
     ]
     recap_df = pd.DataFrame(recap_data)
     
+    # Fill missing months with "-"
+    months = ["January", "February", "March"]
+    for m in months:
+        if m not in recap_df.columns:
+            recap_df[m] = "-"
+        recap_df[m] = recap_df[m].fillna("-")
+
     print("\n--- Testing Sorting Logic ---")
     print("Original Order:", recap_df['No Absen'].tolist())
     
@@ -75,28 +82,62 @@ def test_recap():
     if recap_df['No Absen'].tolist() == ["1", "2", "10"]:
         print("SUCCESS: Numeric sorting works correctly.")
     else:
-        print("FAILURE: Numeric sorting failed (likely lexicographical: 1, 10, 2).")
-
-    # Mock Total Row Logic
+        print("FAILURE: Numeric sorting failed.")
+        
+    # --- Test Total & Rupiah Logic ---
+    print("\n--- Testing Total & Rupiah Rows ---")
+    
     if not recap_df.empty:
-        total_paid = recap_df['Jumlah'].sum()
-        total_row = {col: "" for col in recap_df.columns}
+        # 1. TOTAL Row
+        total_row = {col: None for col in recap_df.columns}
         total_row["Nama Siswa"] = "TOTAL"
-        total_row["Jumlah"] = total_paid
+        
+        total_jumlah = recap_df['Jumlah'].sum()
+        total_rupiah_col = recap_df['Rupiah'].sum()
+        
+        total_row["Jumlah"] = total_jumlah
+        total_row["Rupiah"] = total_rupiah_col
+        
+        month_counts = {}
+        for month in months:
+            count = recap_df[month].apply(lambda x: 1 if x == "Sudah Bayar" else 0).sum()
+            total_row[month] = count
+            month_counts[month] = count
+            
         recap_df = pd.concat([recap_df, pd.DataFrame([total_row])], ignore_index=True)
+        
+        # 2. RUPIAH Row
+        rupiah_row = {col: None for col in recap_df.columns}
+        rupiah_row["Nama Siswa"] = "RUPIAH"
+        
+        def format_currency(x): return f"Rp {x:,.0f}"
+        
+        for month in months:
+            rupiah_row[month] = format_currency(month_counts[month] * 66000)
+        
+        rupiah_row["Jumlah"] = format_currency(total_jumlah * 66000)
+        rupiah_row["Rupiah"] = format_currency(total_rupiah_col)
+        
+        recap_df = pd.concat([recap_df, pd.DataFrame([rupiah_row])], ignore_index=True)
 
-    print("\nResult Dataframe Head & Tail:")
-    print(recap_df.head())
-    print(recap_df.tail(1))
+    print("\nResult Dataframe Tail (Last 3 rows):")
+    print(recap_df.tail(3))
     
-    if recap_df.iloc[-1]['Nama Siswa'] == "TOTAL":
-         print(f"\nSUCCESS: 'TOTAL' row found. Total Amount: {recap_df.iloc[-1]['Jumlah']}")
+    # Check TOTAL row
+    total_row = recap_df[recap_df['Nama Siswa'] == 'TOTAL'].iloc[0]
+    if total_row['Jumlah'] == 6 and total_row['January'] == 3: # 1+2+3 = 6; All 3 paid Jan
+        print("SUCCESS: TOTAL row calculation (Jumlah & Months) correct.")
     else:
-         print("\nFAILURE: 'TOTAL' row NOT found.")
-    
-    # Check if we have any 'Sudah Bayar'
-    paid_count = (recap_df == "Sudah Bayar").sum().sum()
-    print(f"\nTotal 'Sudah Bayar' cells: {paid_count}")
+        print(f"FAILURE: TOTAL row incorrect. Jumlah: {total_row['Jumlah']}, Jan: {total_row['January']}")
+
+    # Check RUPIAH row
+    rupiah_row = recap_df[recap_df['Nama Siswa'] == 'RUPIAH'].iloc[0]
+    # Jan Count 3 * 66000 = 198,000
+    expected_jan = "Rp 198,000"
+    if rupiah_row['January'] == expected_jan:
+        print(f"SUCCESS: RUPIAH row calculation correct. Jan: {rupiah_row['January']}")
+    else:
+        print(f"FAILURE: RUPIAH row incorrect. Expected {expected_jan}, Got {rupiah_row['January']}")
 
 if __name__ == "__main__":
     test_recap()
