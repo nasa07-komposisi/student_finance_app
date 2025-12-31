@@ -58,39 +58,90 @@ def main():
             transactions = database.get_transactions()
             students = database.get_all_students()
             
+            # --- SVGs (Lineart) ---
+            ICON_INCOME = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>"""
+            ICON_STUDENTS = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>"""
+            ICON_CALENDAR = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>"""
+            ICON_OUTPUT = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path><line x1="16" y1="8" x2="2" y2="22"></line><line x1="17.5" y1="15" x2="9" y2="15"></line></svg>"""
+
             # --- Custom CSS for Cards ---
             st.markdown("""
             <style>
             .dashboard-card {
                 background-color: white;
-                border-radius: 10px;
-                padding: 20px;
+                border-radius: 12px;
+                padding: 24px;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                text-align: center;
-                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                margin-bottom: 20px;
+                transition: transform 0.2s;
             }
-            .dashboard-card h3 {
-                margin: 0;
-                color: #555;
-                font-size: 16px;
+            .dashboard-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
             }
-            .dashboard-card h2 {
-                margin: 10px 0 0 0;
-                color: #2c3e50;
+            .icon-box {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 15px;
                 font-size: 24px;
+            }
+            .card-content {
+                flex-grow: 1;
+            }
+            .card-title {
+                margin: 0;
+                color: #6b7280;
+                font-size: 14px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .card-value {
+                margin: 5px 0 0 0;
+                color: #111827;
+                font-size: 24px;
+                font-weight: 700;
+            }
+            
+            /* Color Themes - background for whole card */
+            .theme-green { background-color: #dcfce7; border-left: 5px solid #16a34a; }
+            .theme-blue { background-color: #dbeafe; border-left: 5px solid #2563eb; }
+            .theme-purple { background-color: #f3e8ff; border-left: 5px solid #9333ea; }
+            .theme-red { background-color: #fee2e2; border-left: 5px solid #dc2626; }
+            .theme-orange { background-color: #ffedd5; border-left: 5px solid #ea580c; }
+            
+            /* Monochrome Icon Box */
+            .icon-box {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background-color: rgba(255, 255, 255, 0.5); /* Semi-transparent white */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 15px;
+                /* Removed fixed font size and filter for SVGs */
+                color: #374151; /* Dark grey for SVG stroke via currentColor */
+            }
+            .dashboard-card svg {
+                width: 28px;
+                height: 28px;
             }
             </style>
             """, unsafe_allow_html=True)
             
             # Helper to create card
-            def card(title, value, help_text=None):
-                st.markdown(f"""
-                <div class="dashboard-card">
-                    <h3>{title}</h3>
-                    <h2>{value}</h2>
-                    {f'<p style="font-size:12px;color:#888;">{help_text}</p>' if help_text else ''}
-                </div>
-                """, unsafe_allow_html=True)
+            # Helper to create card
+            def card(title, value, icon="💰", color="green", help_text=None):
+                help_p = f'<p style="font-size:12px;color:#888;margin-top:4px;">{help_text}</p>' if help_text else ''
+                html = f"""<div class="dashboard-card theme-{color}"><div class="icon-box">{icon}</div><div class="card-content"><p class="card-title">{title}</p><p class="card-value">{value}</p>{help_p}</div></div>"""
+                st.markdown(html, unsafe_allow_html=True)
 
             if not transactions.empty:
                 # 1. Total Income (All Time)
@@ -113,9 +164,9 @@ def main():
                 # Row 1: Total Overview
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    card("TOTAL UANG MASUK (All Time)", format_currency(total_income))
+                    card("TOTAL UANG MASUK", format_currency(total_income), icon=ICON_INCOME, color="green")
                 with c2:
-                    card("Total Siswa Aktif", f"{len(students[students['status'] == 'Active'])}")
+                    card("Total Siswa Aktif", f"{len(students[students['status'] == 'Active'])}", icon=ICON_STUDENTS, color="blue")
                     
                 st.markdown("### Uang Masuk per Tahun")
                 if not income_by_year.empty:
@@ -123,21 +174,21 @@ def main():
                     cols = st.columns(4) # Max 4 per row
                     for i, (year, amount) in enumerate(income_by_year.items()):
                         with cols[i % 4]:
-                           card(f"Tahun {year}", format_currency(amount))
+                           card(f"Tahun {year}", format_currency(amount), icon=ICON_CALENDAR, color="purple")
                 else:
                     st.info("Belum ada data pemasukan.")
                 
                 st.divider()
 
                 # SECTION 2: PENGELUARAN
-                st.subheader("PENGELUARAN (Per Transaksi)")
+                st.subheader("PENGELUARAN")
                 
                 if not expense_by_desc.empty:
                     # Total Expense Card
                     total_expense = expense_df['amount'].sum()
                     cols_total = st.columns(3)
                     with cols_total[0]:
-                        card("TOTAL PENGELUARAN", format_currency(total_expense))
+                        card("TOTAL PENGELUARAN", format_currency(total_expense), icon=ICON_OUTPUT, color="red")
                     
                     st.markdown("#### Rincian per Transaksi")
                     
@@ -170,7 +221,7 @@ def main():
         
         # Add Student Section
         with st.expander("Tambah Siswa Baru"):
-            with st.form("add_student_form"):
+            with st.form("add_student_form", clear_on_submit=True):
                 name = st.text_input("Nama Siswa")
                 attendance_number = st.text_input("Nomor Absen")
                 class_name = st.text_input("Kelas")
@@ -191,28 +242,30 @@ def main():
         
         if not students.empty:
             # Table Header
-            c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 2, 2, 2])
+            c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 1, 2, 2, 2, 2])
             with c1: st.write("**ID**")
             with c2: st.write("**Nama**")
             with c3: st.write("**Absen**")
             with c4: st.write("**Kelas**")
-            with c5: st.write("**Status**")
-            with c6: st.write("**Aksi**")
+            with c5: st.write("**Kontak**")
+            with c6: st.write("**Status**")
+            with c7: st.write("**Aksi**")
             
             st.divider()
             
             # Iterate Rows
             for index, row in students.iterrows():
-                c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 2, 2, 2, 2])
+                c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 2, 1, 2, 2, 2, 2])
                 with c1: st.write(str(row['id']))
                 with c2: st.write(row['name'])
                 with c3: st.write(str(row['attendance_number']) if pd.notna(row['attendance_number']) else "-")
                 with c4: st.write(row['class_name'])
-                with c5: 
+                with c5: st.write(row['parent_contact'] if pd.notna(row['parent_contact']) else "-")
+                with c6: 
                     status_color = "green" if row['status'] == "Active" else "red"
                     st.markdown(f":{status_color}[{row['status']}]")
                 
-                with c6:
+                with c7:
                     col_edit, col_del = st.columns(2)
                     if col_edit.button("✏️", key=f"edit_btn_{row['id']}", help="Edit Siswa"):
                         st.session_state[f'edit_mode_{row["id"]}'] = not st.session_state.get(f'edit_mode_{row["id"]}', False)
@@ -272,7 +325,7 @@ def main():
         
         # Collapsible Add Transaction Form
         with st.expander("Tambah Transaksi Baru"):
-            with st.form("add_transaction_form"):
+            with st.form("add_transaction_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -437,8 +490,15 @@ def main():
             display_df = filtered_df[display_columns].copy()
             
             display_df.columns = ["Tanggal", "Nama Siswa", "Absen", "Jenis", "Nominal", "Bulan Bayar", "Tahun Bayar", "Keterangan"]
+            
+            # Format Currency
+            display_df['Nominal'] = display_df['Nominal'].apply(format_currency)
+            
+            # Format Date dd-mmm-yyyy (e.g., 20-Jan-2024)
+            # Ensure it is datetime first (it should be from earlier steps, but safe to check)
+            display_df['Tanggal'] = pd.to_datetime(display_df['Tanggal']).dt.strftime('%d-%b-%Y')
                 
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             col1, col2 = st.columns(2)
             csv = display_df.to_csv(index=False).encode('utf-8')
@@ -505,6 +565,7 @@ def main():
                         row_data[month] = "-"
                 
                 row_data["Jumlah"] = paid_count
+                row_data["Rupiah"] = paid_count * 66000
                 
                 # Try to convert No Absen to numeric for better native sorting
                 try:
@@ -516,14 +577,56 @@ def main():
                 
             recap_df = pd.DataFrame(recap_data)
 
-            # Calculate and Append Total Row
+            # Calculate and Append Total & Rupiah Rows
             if not recap_df.empty:
-                total_paid = recap_df['Jumlah'].sum()
+                # Calculate totals BEFORE formatting
+                total_jumlah = recap_df['Jumlah'].sum()
+                total_rupiah_col = recap_df['Rupiah'].sum() # Sum on raw numbers
+                
+                # Now format the main column
+                recap_df['Rupiah'] = recap_df['Rupiah'].apply(format_currency)
+                
+                # 1. TOTAL Row
                 total_row = {col: None for col in recap_df.columns}
                 total_row["Nama Siswa"] = "TOTAL"
-                total_row["Jumlah"] = total_paid
+                total_row["No Absen"] = ""
                 
+                total_row["Jumlah"] = total_jumlah
+                total_row["Rupiah"] = format_currency(total_rupiah_col) # Match format
+                
+                # Count 'Sudah Bayar' for month columns
+                month_counts = {}
+                for month in months:
+                    count = recap_df[month].apply(lambda x: 1 if x == "Sudah Bayar" else 0).sum()
+                    total_row[month] = count
+                    month_counts[month] = count
+                    
                 recap_df = pd.concat([recap_df, pd.DataFrame([total_row])], ignore_index=True)
+                
+                # 2. RUPIAH Row
+                rupiah_row = {col: None for col in recap_df.columns}
+                rupiah_row["Nama Siswa"] = "RUPIAH"
+                rupiah_row["No Absen"] = ""
+
+                
+                # Calculate Rupiah for months
+                for month in months:
+                    rupiah_row[month] = format_currency(month_counts[month] * 66000)
+                
+                # For Jumlah column, maybe show the total Rupiah equivalent? 
+                # User request: "buat baris rupiah yang merupakan hasil total dikali dengan 66.000 rupiah"
+                rupiah_row["Jumlah"] = format_currency(total_jumlah * 66000)
+                rupiah_row["Rupiah"] = format_currency(total_rupiah_col) # Already in Rupiah
+                
+                recap_df = pd.concat([recap_df, pd.DataFrame([rupiah_row])], ignore_index=True)
+
+            # Format Rupiah column in main df for display?
+            # It might be better to keep as numbers for sorting until the end, but the Total row mixes types (counts).
+            # Streamlit dataframe handles mixed types okay. 
+            # Let's format the money columns in the rows for better readability if possible, 
+            # or use column_config. For now, I'll format the new row values as currency strings.
+            # The 'Rupiah' column in main body is number.
+            
             
             # Sort by No Absen (try to convert to int if possible for correct sorting)
             # Create a localized column mapping if desired, but user asked for standard months? 
@@ -544,7 +647,8 @@ def main():
             st.dataframe(
                 recap_df.style.applymap(color_paid, subset=list(indo_months.values())),
                 use_container_width=True,
-                height=500
+                height=500,
+                hide_index=True
             )
 
 if __name__ == '__main__':
