@@ -5,6 +5,9 @@ import plotly.express as px
 from datetime import datetime
 from fpdf import FPDF
 import base64
+from io import BytesIO
+import xlsxwriter # Ensure available for engine lookup
+import openpyxl # Ensure available
 
 # Page Configuration
 st.set_page_config(
@@ -220,7 +223,9 @@ def main():
         st.header("Manajemen Data Siswa")
         
         # Add Student Section
-        with st.expander("Tambah Siswa Baru"):
+        tab_manual, tab_upload = st.tabs(["Input Manual", "Upload Massal"])
+        
+        with tab_manual:
             with st.form("add_student_form", clear_on_submit=True):
                 name = st.text_input("Nama Siswa")
                 attendance_number = st.text_input("Nomor Absen")
@@ -230,11 +235,77 @@ def main():
                 
                 if submit:
                     if name and class_name:
-                        database.add_student(name, attendance_number, class_name, contact)
-                        st.success(f"Siswa {name} berhasil ditambahkan!")
-                        st.rerun()
+                        result = database.add_student(name, attendance_number, class_name, contact)
+                        if result:
+                            st.success(f"Siswa {name} berhasil ditambahkan!")
+                            st.rerun()
+                        else:
+                            st.error("Gagal menambahkan siswa ke database.")
                     else:
                         st.error("Nama dan Kelas wajib diisi.")
+
+        with tab_upload:
+            st.markdown("### Upload Data Siswa Massal")
+            st.info("Format file Excel (.xlsx) harus memiliki kolom: **Nama, Absen, Kelas, Kontak**")
+            
+            # Template Download
+            template_data = {
+                'Nama': ['Siswa Contoh 1', 'Siswa Contoh 2'],
+                'Absen': ['01', '02'],
+                'Kelas': ['10A', '10B'],
+                'Kontak': ['08123456789', '08987654321']
+            }
+            df_template = pd.DataFrame(template_data)
+            
+            # Create styling for template if possible, or just raw data
+            # Use BytesIO for download buffer
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df_template.to_excel(writer, index=False, sheet_name='Template Siswa')
+            
+            st.download_button(
+                label="📥 Download Template Excel",
+                data=buffer.getvalue(),
+                file_name="template_siswa.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+            st.divider()
+            
+            uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
+            
+            if uploaded_file is not None:
+                try:
+                    df_upload = pd.read_excel(uploaded_file)
+                    st.write("Preview Data:")
+                    st.dataframe(df_upload.head())
+                    
+                    if st.button("Proses Upload"):
+                        # Validate columns
+                        required_cols = ['Nama', 'Absen', 'Kelas', 'Kontak']
+                        if all(col in df_upload.columns for col in required_cols):
+                            success_count = 0
+                            with st.status("Memproses data...", expanded=True) as status:
+                                for index, row in df_upload.iterrows():
+                                    if pd.notna(row['Nama']) and pd.notna(row['Kelas']):
+                                        # Handle numeric conversion for contact/absen if pandas read them as float
+                                        r_name = str(row['Nama'])
+                                        r_absen = str(int(row['Absen'])) if pd.notna(row['Absen']) and isinstance(row['Absen'], (int, float)) else str(row['Absen'])
+                                        r_class = str(row['Kelas'])
+                                        r_contact = str(int(row['Kontak'])) if pd.notna(row['Kontak']) and isinstance(row['Kontak'], (int, float)) else str(row['Kontak'])
+                                        
+                                        # Use update or skip? Simple add for now.
+                                        database.add_student(r_name, r_absen, r_class, r_contact)
+                                        success_count += 1
+                                status.update(label="Selesai!", state="complete", expanded=False)
+                            
+                            st.success(f"Berhasil mengimpor {success_count} data siswa!")
+                            st.rerun()
+                        else:
+                            st.error(f"Format Kolom Salah! Pastikan kolom berikut ada: {', '.join(required_cols)}")
+                            
+                except Exception as e:
+                    st.error(f"Gagal membaca file: {e}")
         
         # Display Students
         st.subheader("Daftar Siswa")
@@ -323,43 +394,99 @@ def main():
                 student_dict[label] = row['id']
                 student_details[row['id']] = row
         
-        # Collapsible Add Transaction Form
-        with st.expander("Tambah Transaksi Baru"):
-            with st.form("add_transaction_form", clear_on_submit=True):
+        # Tabs for Transaction Entry
+        tab_in, tab_out = st.tabs(["Transaksi Masuk", "Transaksi Keluar"])
+        
+        # --- TAB 1: PEMASUKAN ---
+        with tab_in:
+            with st.form("add_income_form", clear_on_submit=True):
+                # Row 1: Student & Amount
                 col1, col2 = st.columns(2)
-                
                 with col1:
-                    student_option = st.selectbox("Pilih Siswa", options=list(student_dict.keys())) if student_dict else st.selectbox("Pilih Siswa", ["Data Kosong"])
+                    i_student = st.selectbox("Pilih Siswa", options=list(student_dict.keys()), key="in_stu") if student_dict else st.selectbox("Pilih Siswa", ["Data Kosong"], key="in_stu_e")
                     
-                    # Auto-fill Attendance Number
-                    current_absen = ""
-                    if student_dict and student_option:
-                        s_id = student_dict[student_option]
+                    # Auto-fill Absen (Visual only)
+                    i_absen = ""
+                    if student_dict and i_student:
+                        s_id = student_dict[i_student]
                         s_row = student_details.get(s_id)
                         if s_row is not None and pd.notna(s_row['attendance_number']):
-                            current_absen = s_row['attendance_number']
+                            i_absen = s_row['attendance_number']
+                    st.text_input("Nomor Absen", value=i_absen, disabled=True, key="in_absen")
                     
-                    st.text_input("Nomor Absen", value=current_absen, disabled=True)
+                with col2:
+                    i_amount = st.number_input("Jumlah per Bulan (Rp)", min_value=0, step=1000, key="in_amt")
+                    i_date = st.date_input("Tanggal Transaksi", datetime.now(), key="in_date")
+                
+                st.divider()
+                
+                # Row 2: Year & Months using Columns/Checkboxes
+                st.write("**Periode Pembayaran**")
+                cy = datetime.now().year
+                # Year dropdown: 2021 to 2030+
+                years = list(range(2021, cy + 3))
+                i_year = st.selectbox("Tahun Pembayaran", years, index=years.index(cy) if cy in years else 0, key="in_yr")
+                
+                st.write("Bulan Pembayaran (Bisa pilih lebih dari satu):")
+                months_list = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+                
+                # Create a grid for checkboxes
+                m_cols = st.columns(4)
+                selected_months = []
+                # Use a loop to create checkboxes. Note: st.form needs keys.
+                # Since clear_on_submit=True, keys will reset.
+                for idx, m_name in enumerate(months_list):
+                    with m_cols[idx % 4]:
+                        if st.checkbox(m_name, key=f"chk_m_{idx}"):
+                            selected_months.append(m_name)
+                
+                st.divider()
+                i_desc = st.text_area("Keterangan", key="in_desc")
+                i_submit = st.form_submit_button("Simpan Pemasukan")
+                
+                if i_submit:
+                    if student_dict:
+                        if not selected_months:
+                            st.error("Mohon pilih setidaknya satu bulan pembayaran.")
+                        else:
+                            db_stu_id = student_dict[i_student]
+                            saved_count = 0
+                            for m_pay in selected_months:
+                                database.add_transaction(db_stu_id, str(i_date), "Pemasukan", i_amount, m_pay, i_year, i_desc)
+                                saved_count += 1
+                            
+                            st.success(f"Berhasil menyimpan {saved_count} transaksi pemasukan!")
+                            st.rerun()
+                    else:
+                        st.error("Data siswa kosong.")
+
+        # --- TAB 2: PENGELUARAN ---
+        with tab_out:
+            with st.form("add_expense_form", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    # User request: Replace student dropdown with text input for Recipient
+                    o_recipient = st.text_input("Penerima Dana", placeholder="Contoh: Toko Buku, Jasa Kebersihan", key="out_rec")
                     
-                    trans_type = st.selectbox("Jenis Transaksi", ["Pemasukan", "Pengeluaran"])
-                    amount = st.number_input("Jumlah (Rp)", min_value=0, step=1000)
+                    o_amount = st.number_input("Jumlah (Rp)", min_value=0, step=1000, key="out_amt")
                 
                 with col2:
-                    payment_month = st.selectbox("Bulan Pembayaran", ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"])
-                    payment_year = st.number_input("Tahun Pembayaran", min_value=2020, max_value=2030, value=datetime.now().year)
-                    date = st.date_input("Tanggal Transaksi", datetime.now())
-                    
-                desc = st.text_area("Keterangan")
-                submit = st.form_submit_button("Simpan Transaksi")
+                    o_month = st.selectbox("Bulan (Opsional)", ["-"] + ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], key="out_mon")
+                    o_year = st.number_input("Tahun", min_value=2020, max_value=2030, value=datetime.now().year, key="out_yr")
+                    o_date = st.date_input("Tanggal", datetime.now(), key="out_date")
+
+                o_desc = st.text_area("Keterangan Pengeluaran", key="out_desc")
+                o_submit = st.form_submit_button("Simpan Pengeluaran", type="primary")
                 
-                if submit:
-                    if student_dict:
-                        student_id = student_dict[student_option]
-                        database.add_transaction(student_id, str(date), trans_type, amount, payment_month, payment_year, desc)
-                        st.success("Transaksi berhasil disimpan!")
+                if o_submit:
+                    if o_recipient:
+                        final_month = o_month if o_month != "-" else None
+                        # Pass student_id=None, recipient=o_recipient
+                        database.add_transaction(None, str(o_date), "Pengeluaran", o_amount, final_month, o_year, o_desc, recipient=o_recipient)
+                        st.success("Pengeluaran berhasil disimpan!")
                         st.rerun()
                     else:
-                        st.error("Tambahkan data siswa terlebih dahulu.")
+                        st.error("Mohon isi nama Penerima Dana.")
         
         # History
         st.subheader("Riwayat Transaksi")
@@ -368,7 +495,9 @@ def main():
         if not transactions.empty:
             # Header
             cols = st.columns([1, 2, 1, 2, 2, 2, 2, 2])
-            headers = ["Tgl", "Siswa", "Absen", "Jenis", "Nominal", "Bulan", "Ket", "Aksi"]
+            # Header
+            cols = st.columns([1, 2, 1, 2, 2, 2, 2, 2])
+            headers = ["Tgl", "Siswa/Penerima", "Absen", "Jenis", "Nominal", "Bulan", "Ket", "Aksi"]
             for col, h in zip(cols, headers):
                 col.write(f"**{h}**")
             st.divider()

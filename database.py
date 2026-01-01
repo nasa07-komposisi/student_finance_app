@@ -126,16 +126,16 @@ def get_all_students():
             conn.close()
     return pd.DataFrame()
 
-def add_transaction(student_id, date, type_, amount, payment_month, payment_year, description):
+def add_transaction(student_id, date, type_, amount, payment_month, payment_year, description, recipient=None):
     """Add a new transaction."""
     conn = create_connection()
     if conn is not None:
         try:
             c = conn.cursor()
             c.execute("""
-                INSERT INTO transactions (student_id, date, type, amount, payment_month, payment_year, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (student_id, date, type_, amount, payment_month, payment_year, description))
+                INSERT INTO transactions (student_id, recipient, date, type, amount, payment_month, payment_year, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (student_id, recipient, date, type_, amount, payment_month, payment_year, description))
             conn.commit()
             return c.lastrowid
         except sqlite3.Error as e:
@@ -179,17 +179,29 @@ def delete_transaction(transaction_id):
     return False
 
 def get_transactions():
-    """Retrieve all transactions with student names."""
+    """Retrieve all transactions with student names or recipient."""
     conn = create_connection()
     if conn is not None:
         try:
+            # Query updated to handle NULL student_id and include recipient
+            # Use COALESCE to prioritize student name, but we might want to distinct them?
+            # User wants "Penerima Dana".
             query = """
-                SELECT t.id, t.student_id, s.name as student_name, s.attendance_number, t.date, t.type, t.amount, t.payment_month, t.payment_year, t.description
+                SELECT t.id, t.student_id, t.recipient, s.name as student_name, s.attendance_number, t.date, t.type, t.amount, t.payment_month, t.payment_year, t.description
                 FROM transactions t
-                JOIN students s ON t.student_id = s.id
+                LEFT JOIN students s ON t.student_id = s.id
                 ORDER BY t.date DESC
             """
-            return pd.read_sql_query(query, conn)
+            df = pd.read_sql_query(query, conn)
+            # Create a unified 'name' column for display logic if needed, 
+            # or keep them separate. App likely expects 'student_name'.
+            # Let's fill student_name with recipient if student_id is None
+            if not df.empty:
+                df['student_name'] = df.apply(
+                    lambda row: row['student_name'] if pd.notna(row['student_id']) else (row['recipient'] if pd.notna(row['recipient']) else "-"),
+                    axis=1
+                )
+            return df
         except Exception as e:
             print(f"Error fetching transactions: {e}")
         finally:
