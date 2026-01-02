@@ -50,7 +50,7 @@ def main():
     st.title("💰 Sistem Pencatatan Keuangan Siswa")
 
     # Sidebar Navigation
-    menu = ["Dashboard", "Siswa", "Transaksi", "Laporan", "Rekap"]
+    menu = ["Dashboard", "Siswa", "Transaksi", "Laporan", "Rekap", "Pengaturan"]
     choice = st.sidebar.selectbox("Menu", menu)
 
     if choice == "Dashboard":
@@ -779,6 +779,28 @@ def main():
                 height=500,
                 hide_index=True
             )
+
+    elif choice == "Pengaturan":
+        st.header("Pengaturan Sistem")
+        st.write("Kelola konfigurasi sistem dan data.")
+        
+        st.subheader("Backup & Restore")
+        st.info("Unduh file database untuk keperluan backup.")
+        
+        # Read DB file
+        try:
+            with open(database.DB_NAME, "rb") as f:
+                db_bytes = f.read()
+                
+            st.download_button(
+                label="📥 Download Backup Database (.db)",
+                data=db_bytes,
+                file_name="student_finance_backup.db",
+                mime="application/x-sqlite3"
+            )
+            st.caption("Simpan file ini di tempat yang aman. File ini berisi seluruh data siswa dan transaksi.")
+        except FileNotFoundError:
+            st.error("File database tidak ditemukan.")
 
 if __name__ == '__main__':
     # Initialize DB if needed
