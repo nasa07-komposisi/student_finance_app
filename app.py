@@ -784,38 +784,13 @@ def main():
         st.header("Pengaturan Sistem")
         st.write("Kelola konfigurasi sistem dan data.")
         
-        st.subheader("Backup & Restore")
-        st.info("Unduh file database untuk keperluan backup.")
+        st.subheader("Database Cloud (Supabase)")
+        st.success("Aplikasi ini sekarang terhubung ke database cloud Supabase.")
+        st.info("Seluruh data Anda tersimpan secara aman di cloud Supabase dan tidak akan hilang meskipun aplikasi direstart.")
         
-        # Read DB file
-        try:
-            with open(database.DB_NAME, "rb") as f:
-                db_bytes = f.read()
-                
-            st.download_button(
-                label="📥 Download Backup Database (.db)",
-                data=db_bytes,
-                file_name="student_finance_backup.db",
-                mime="application/x-sqlite3"
-            )
-            st.caption("Simpan file ini di tempat yang aman. File ini berisi seluruh data siswa dan transaksi.")
-        except FileNotFoundError:
-            st.error("File database tidak ditemukan.")
-
-        st.divider()
-        st.subheader("Restore Database")
-        st.warning("⚠️ Mengunggah file database akan **menghapus dan menimpa** data yang ada saat ini.")
-        
-        uploaded_db = st.file_uploader("Upload File Backup (.db)", type=['db'])
-        if uploaded_db is not None:
-            if st.button("Restore Sekarang"):
-                try:
-                    with open(database.DB_NAME, "wb") as f:
-                        f.write(uploaded_db.getbuffer())
-                    st.success("Database berhasil direstore! Aplikasi akan memuat ulang data...")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Gagal melakukan restore: {e}")
+        st.write("**Detail Proyek:**")
+        st.code(f"URL: {st.secrets['SUPABASE_URL']}")
+        st.caption("Gunakan Dashboard Supabase untuk mengelola data secara langsung atau melakukan backup.")
 
 if __name__ == '__main__':
     # Initialize DB if needed
