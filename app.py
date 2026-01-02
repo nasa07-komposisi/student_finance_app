@@ -802,6 +802,21 @@ def main():
         except FileNotFoundError:
             st.error("File database tidak ditemukan.")
 
+        st.divider()
+        st.subheader("Restore Database")
+        st.warning("⚠️ Mengunggah file database akan **menghapus dan menimpa** data yang ada saat ini.")
+        
+        uploaded_db = st.file_uploader("Upload File Backup (.db)", type=['db'])
+        if uploaded_db is not None:
+            if st.button("Restore Sekarang"):
+                try:
+                    with open(database.DB_NAME, "wb") as f:
+                        f.write(uploaded_db.getbuffer())
+                    st.success("Database berhasil direstore! Aplikasi akan memuat ulang data...")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Gagal melakukan restore: {e}")
+
 if __name__ == '__main__':
     # Initialize DB if needed
     database.create_tables()
