@@ -774,7 +774,7 @@ def main():
                 return f'background-color: {color}' if color else ''
 
             st.dataframe(
-                recap_df.style.applymap(color_paid, subset=list(indo_months.values())),
+                recap_df.style.map(color_paid, subset=list(indo_months.values())),
                 use_container_width=True,
                 height=500,
                 hide_index=True
